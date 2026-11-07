@@ -217,3 +217,10 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 
 }
 #bmLink { cursor: grab; }
 #bmLink:active { cursor: grabbing; }
+
+.brand-name {
+  background: linear-gradient(92deg, #0b6bcb, #16a3a3);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

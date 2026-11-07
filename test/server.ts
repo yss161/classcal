@@ -34,7 +34,7 @@ const term = { name: "2026 秋", start: "2026-09-07", weeks: 18, alarm: 10 };
 console.log("\n[1] 静态与健康检查");
 const home = await call("/");
 const homeText = await home.text();
-ok("GET / 返回 index.html", home.status === 200 && homeText.includes("课表 → iPhone 日历"));
+ok("GET / 返回 index.html", home.status === 200 && homeText.includes("ClassCal"));
 ok("GET /app.js 正常", (await call("/app.js")).status === 200);
 ok("GET /style.css 正常", (await call("/style.css")).status === 200);
 ok("/api/health", (await call("/api/health")).status === 200);

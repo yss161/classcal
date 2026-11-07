@@ -96,7 +96,7 @@ function eventLines(tt: Timetable, course: Course, run: { start: number; step: n
   const dtStart = ymd(dayMs) + "T" + p1.s.replace(":", "") + "00";
   const dtEnd = ymd(dayMs) + "T" + p2.e.replace(":", "") + "00";
 
-  const uid = fnv1a([term.start, course.name, course.day, course.start, course.end, run.start].join("|")) + "-" + run.start + "@kcb-ics";
+  const uid = fnv1a([term.start, course.name, course.day, course.start, course.end, run.start].join("|")) + "-" + run.start + "@classcal";
   const descParts: string[] = [];
   if (course.teacher) descParts.push("教师：" + course.teacher);
   descParts.push("周次：" + weeksToSpec(course.weeks));
@@ -129,7 +129,7 @@ export function buildIcs(tt: Timetable, nowDate?: Date): string {
   const head: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//kcb-ics//Course Table to iCal//CN",
+    "PRODID:-//classcal//Course Table to iCal//CN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "X-WR-CALNAME:" + escapeText(tt.term.name),

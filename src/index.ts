@@ -97,7 +97,7 @@ export default {
 
     try {
       if (pathname === "/api/health") {
-        return json({ ok: true, service: "kcb-ics", time: new Date().toISOString() });
+        return json({ ok: true, service: "classcal", time: new Date().toISOString() });
       }
 
       /* ---------- 生成 token / 订阅链接 ---------- */
@@ -236,7 +236,7 @@ export default {
           return new Response(ics, {
             headers: {
               "content-type": "text/calendar; charset=utf-8",
-              "content-disposition": 'inline; filename="kcb.ics"',
+              "content-disposition": 'inline; filename="classcal.ics"',
               "cache-control": "public, max-age=300",
               "access-control-allow-origin": "*",
             },

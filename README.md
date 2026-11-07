@@ -1,4 +1,6 @@
-# kcb-ics · 课表 → iPhone 日历
+# ClassCal · 课表 → 手机日历
+
+> ClassCal = **Class** + **Cal**endar。把课程表变成一条日历订阅链接，iPhone / Android / Mac / Outlook 通用。
 
 把课程表变成一条 **日历订阅链接**，用 iPhone 自带日历订阅它。
 不装 App、不买开发者证书、不需要服务器 —— 部署在 Cloudflare Workers 上，免费额度足够。
@@ -42,11 +44,9 @@ npm run typecheck
 
 ### B. 一键部署按钮
 
-在 README 里把下面的 `USER/REPO` 换成你自己的，读者点一下就能克隆 + 部署（会引导登录并创建 Worker）：
+点一下就会克隆本仓库并在你的 Cloudflare 账号里创建 Worker（会引导登录）：
 
-```markdown
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/USER/REPO)
-```
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/yss161/classcal)
 
 ### C. GitHub Actions（仓库自带工作流）
 
@@ -75,7 +75,7 @@ npm run deploy
 默认模式下课表数据内嵌在链接里（无需任何存储），代价是**改课表会产生新链接**。
 如果希望「链接永远不变、iPhone 自动同步课表更新」，加一个 KV：
 
-1. Cloudflare 面板 → **Storage & Databases → KV** → Create namespace，名字随意（例如 `kcb-ics-cal`）。
+1. Cloudflare 面板 → **Storage & Databases → KV** → Create namespace，名字随意（例如 `classcal-cal`）。
 2. 给 Worker 添加绑定：Worker → **Settings → Bindings → Add → KV namespace**，**Variable name 必须填 `CAL`**，选中刚建的 namespace。
    （或者写进 `wrangler.jsonc`：`"kv_namespaces": [{ "binding": "CAL", "id": "<namespace id>" }]`）
 3. 重新部署。前端会自动从「链接内嵌」切到「固定链接」，页面上会显示「固定链接」标记。

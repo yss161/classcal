@@ -1,6 +1,6 @@
 /* 课表 → iPhone 日历：前端逻辑（无框架、无构建） */
 const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-const STORAGE_KEY = "kcb-ics.v1";
+const STORAGE_KEY = "classcal.v1";
 
 const DEFAULT_PERIODS = [
   ["08:00", "08:45"], ["08:55", "09:40"], ["10:00", "10:45"], ["10:55", "11:40"],
@@ -16,7 +16,7 @@ let lastLinks = null;
 let autoTimer = null;
 /** 固定链接模式：{ id, key }，存在本地，只有本浏览器能更新它 */
 let kv = null;
-const KV_STORE = "kcb-ics.kv";
+const KV_STORE = "classcal.kv";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
