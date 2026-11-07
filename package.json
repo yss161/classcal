@@ -7,12 +7,15 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node test/run.ts && node test/server.ts && node test/jw.ts && node test/xlsx.ts",
+    "test": "node test/run.ts && node test/server.ts && node test/jw.ts && node test/xlsx.ts && node test/schema.ts",
     "test:core": "node test/run.ts",
     "test:server": "node test/server.ts",
     "typecheck": "tsc --noEmit",
     "test:jw": "node test/jw.ts",
-    "test:xlsx": "node test/xlsx.ts"
+    "test:xlsx": "node test/xlsx.ts",
+    "test:schema": "node test/schema.ts",
+    "check:frontend": "tsc --noEmit --allowJs --checkJs false --module esnext --target es2022 --moduleResolution bundler public/app.js public/lib/course-table-schema.js public/lib/ics-export.js public/lib/sample-course-table.js public/ui/json-import.js",
+    "check:no-llm": "node scripts/check-no-llm.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

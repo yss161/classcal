@@ -224,3 +224,38 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 
   background-clip: text;
   color: transparent;
 }
+
+/* ---- JSON 导入面板 ---- */
+.status {
+  margin: 10px 0;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #f2f5fa;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.status.good { background: #eefaf3; border-color: #cbe9d6; color: #1c7a3f; }
+.status.bad { background: #fdf2f0; border-color: #f0d7d3; color: #a5342a; }
+
+.issues { margin: 8px 0 12px; font-size: 13px; }
+.issues ul { margin: 0; padding-left: 18px; }
+.issues .issue { margin-bottom: 5px; line-height: 1.5; }
+.issues .issue.error { color: #a5342a; }
+.issues .issue.warn { color: #8a6a12; }
+.issues .issue[data-goto] { cursor: pointer; }
+.issues .issue[data-goto]:hover b { text-decoration: underline; }
+.issue-hint { color: var(--muted); }
+
+.preview-card { margin-top: 10px; }
+.inline-hint { margin-left: 8px; font-weight: 400; }
+
+#jsonTable td.w-name { min-width: 150px; }
+#jsonTable td.w-small { min-width: 92px; }
+#jsonTable td.w-day { min-width: 84px; }
+#jsonTable td.w-loc { min-width: 120px; }
+#jsonTable tr.has-warning td { background: #fffbe9; }
+#jsonTable tr.flash td { background: #e8f1fe; transition: background .3s ease; }
+
+#jsonInput { min-height: 160px; }
+#jsonFile { max-width: 300px; }

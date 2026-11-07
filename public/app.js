@@ -1,3 +1,5 @@
+import { mountJsonImport } from "./ui/json-import.js";
+
 /* 课表 → iPhone 日历：前端逻辑（无框架、无构建） */
 const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const STORAGE_KEY = "classcal.v1";
@@ -549,6 +551,10 @@ async function init() {
   bindGenerate();
   bindUnlink();
   bindMisc();
+  mountJsonImport({
+    getTerm: () => state.term,
+    toast,
+  });
   if (state.courses.length) generate(true);
 }
 

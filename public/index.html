@@ -49,6 +49,7 @@
       <button class="tab" data-panel="panel-csv" role="tab">Excel / CSV</button>
       <button class="tab" data-panel="panel-ics" role="tab">.ics 文件</button>
       <button class="tab" data-panel="panel-jw" role="tab">教务系统</button>
+      <button class="tab" data-panel="panel-json" role="tab">AI JSON</button>
     </div>
 
     <div id="panel-text" class="panel active">
@@ -112,6 +113,57 @@
       </ul>
       <p class="hint">如果你学校的课表结构比较特别，把<b>脱敏后的页面源码</b>发个 issue，加一个适配器很快。</p>
       <p class="hint">📷 课表截图识别还在路线图里（需要视觉模型 API Key）；目前可以先用系统自带的「导出 Excel」→ 存成 CSV → 用 CSV 页签导入。</p>
+    </div>
+
+    <div id="panel-json" class="panel">
+      <p class="hint">
+        这里只做一件事：把 <b>外部 AI 产出的标准 JSON</b> 转成日历文件。
+        本站不调用任何模型、不需要 API Key，也不会上传你的内容（校验与 .ics 生成都在浏览器里完成）。
+      </p>
+
+      <h3>1 · 粘贴 JSON</h3>
+      <p class="hint">
+        支持直接粘 <code>```json … ```</code> 代码块，或夹杂了说明文字的结果——会自动清洗。
+        粘贴即解析，不用点按钮。格式要求见
+        <code>docs/course-table-v1.md</code>（<code>schemaVersion</code> 必须是 <code>course-table-v1</code>）。
+      </p>
+      <div class="row wrap">
+        <input type="file" id="jsonFile" accept=".json,.txt,application/json,text/plain" />
+        <button class="ghost" id="btnJsonClipboard" type="button">读取剪贴板</button>
+        <button class="ghost" id="btnJsonSample" type="button">填入 20 条示例</button>
+        <button class="ghost" id="btnJsonClear" type="button">清空</button>
+      </div>
+      <textarea id="jsonInput" rows="10" placeholder='{"schemaVersion":"course-table-v1","courses":[{"name":"高等数学","teacher":"张伟","weekday":1,"weeks":"1-16","periods":"1-2","location":"教1-101"}]}' spellcheck="false"></textarea>
+
+      <h3>2 · 校验结果</h3>
+      <div id="jsonStatus" class="status">等待粘贴 JSON…</div>
+      <div id="jsonErrors" class="issues" hidden></div>
+      <div id="jsonWarnings" class="issues" hidden></div>
+
+      <h3>3 · 预览与人工修正 <span id="jsonPreviewInfo" class="hint inline-hint"></span></h3>
+      <div id="jsonPreviewCard" class="preview-card" hidden>
+        <div class="table-wrap">
+          <table id="jsonTable">
+            <thead>
+              <tr><th>课程</th><th>教师</th><th>星期</th><th>周次</th><th>节次</th><th>地点</th><th></th></tr>
+            </thead>
+            <tbody id="jsonTableBody"></tbody>
+          </table>
+        </div>
+        <p class="hint">表格可以直接改，改完会自动重新校验。带黄色底的行有提示（鼠标悬停看原因）。</p>
+      </div>
+
+      <h3>4 · 生成 .ics</h3>
+      <p class="hint">用上面「学期设置」里的开学第一周周一 + 作息时间表来排日期；每个具体周次生成一个日程。</p>
+      <div class="row wrap">
+        <label class="inline"><input type="checkbox" id="jsonConfirm" /> 我已核对预览，确认无误</label>
+        <button class="primary" id="btnGenerateIcs" type="button" disabled>下载 .ics</button>
+      </div>
+      <div id="jsonGenInfo" class="hint"></div>
+      <p class="hint">
+        iPhone：把下载到的 <code>.ics</code> 用「文件」App 打开 → 点一下文件 → 会自动弹出「添加到日历 / 全部添加」。
+        想要长期自动同步，用上面的「生成订阅链接」走订阅方式。
+      </p>
     </div>
 
     <div id="warnings" class="warnings" hidden></div>
@@ -181,6 +233,6 @@
 
 <div id="toast" class="toast"></div>
 <pre id="previewBox" class="preview" hidden></pre>
-<script src="/app.js"></script>
+<script type="module" src="/app.js"></script>
 </body>
 </html>

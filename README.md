@@ -11,7 +11,7 @@
 
 ## 功能
 
-- **6 种导入**：粘贴文本自动识别 / 表格手动填 / **Excel（.xlsx，含合并单元格）** / CSV / 已有 .ics 反向导入 / **教务系统（正方、强智、青果、树维、URP…，书签脚本或贴源码）**
+- **7 种导入**：粘贴文本自动识别 / 表格手动填 / **Excel（.xlsx，含合并单元格）** / CSV / 已有 .ics 反向导入 / **教务系统（正方、强智、青果、树维、URP…）** / **外部 AI 产出的标准 JSON（course-table-v1）**
 - **自动生成 iCalendar**：周次（含单双周、断档周次）、节次时间、教室、教师、课前提醒（VALARM）、时区（默认 Asia/Shanghai）
 - **RFC 5545 合规**：75 字节折行、文字转义、VTIMEZONE、稳定 UID、RRULE 压缩周次（18 周课表只产生少量事件）
 - **两种链接模式**
@@ -25,7 +25,9 @@
 ```bash
 npm install
 npm run dev          # 打开 http://127.0.0.1:8787
-npm test             # 181 个断言：核心逻辑 60 + 接口 49 + 教务适配 46 + Excel 26
+npm test             # 258 个断言：核心逻辑 60 + 接口 49 + 教务适配 46 + Excel 26 + JSON 校验 77
+npm run check:no-llm # 验收项：确认前端没有模型调用 / API Key
+npm run check:frontend # 前端模块语法检查
 npm run typecheck
 ```
 
@@ -182,6 +184,23 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
    如果是完全不同的数据来源（JSON 接口）→ 在 `src/lib/jw/` 新建一个模块，仿照 `zf.ts`；
 4. 在 `test/jw.ts` 里加一个样本 + 断言，防止以后改坏。
 
+### 7. 外部 AI 产出的标准 JSON（course-table-v1）
+
+如果你习惯让**别的网页 AI**（ChatGPT / Claude / DeepSeek…）先把课表整理成结构化数据，可以直接把它的输出粘进来：
+
+```
+外部 AI 产出 JSON  →  粘贴/上传到本站「AI JSON」页签  →  校验 + 预览 + 人工修正  →  下载 .ics
+```
+
+- 格式规范：**[docs/course-table-v1.md](docs/course-table-v1.md)**（含结构说明、拆分规则、20 条完整示例，可直接整段喂给 AI）
+- 粘贴**即解析**（不用点按钮），支持 ```json 代码块、前后夹着解释文字、中文引号、结尾多余逗号
+- 校验失败会指到**具体第几条、哪个字段**，例如「第 8 条缺少 weekday（应为 1-7 整数）」，点一下能跳到对应行
+- 预览表可**就地编辑**，改完自动重新走同一个校验管道；有提示的行会高亮（教师/地点为空、课程名疑似粘连、完全重复…）
+- 勾选「确认无误」后才允许下载 .ics；每个具体周次生成一个 VEVENT，UID = 序号 + 内容 hash
+
+> **本站不调用任何模型、不接任何模型 API、不需要 API Key。** 这段链路只做三件事：校验 JSON、展示预览、生成 .ics —— 全部在浏览器里完成，JSON 不会发给服务器。
+> 仓库有自动化检查兜底：`npm run check:no-llm` 会扫描 `public/` 里是否有模型域名、`Bearer` 头、硬编码 `apiKey` 等痕迹，命中即 CI 红。
+
 ### 图片 / 截图识别？
 
 还在路线图：需要接视觉模型 API（自备 Key），识别后仍需人工核对。目前过渡方案：系统里「导出 Excel」→ CSV，或者直接「粘贴文本」。
@@ -221,6 +240,7 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 - 「链接内嵌」模式：**服务器不存任何数据**，你的课表就在链接里。等于「谁知道链接谁知道课表」，别随便公开分享。
 - 「固定链接」模式：课表存在你自己的 Cloudflare KV 里；`id` 是随机 12 位，另有独立的 16 位 `key` 才能修改（只存在你自己浏览器的 localStorage）。
 - 不收集任何分析数据、不引入第三方脚本。
+- 「AI JSON」链路里，**JSON 完全在浏览器内处理**：不发请求、不进 Worker、也不落 localStorage；只有你点「下载 .ics」时才会在本地生成文件。
 
 ## 已知限制
 
@@ -234,6 +254,7 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 
 - [x] 教务系统导入：正方 / 强智 / 青果 / 树维 / URP + 通用表格解析器（书签脚本或贴源码）
 - [x] 纯文本 / CSV / .ics / **Excel(.xlsx)** 导入
+- [x] 外部 AI 产出的标准 JSON 导入（course-table-v1，含校验/预览/人工修正）
 - [ ] 课表截图 OCR（自备 API Key）
 - [ ] 更多学校的 JSON 接口适配（每校提 issue 即可）
 - [ ] 调课/停课（EXDATE）可视化编辑
@@ -244,10 +265,16 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 
 ```
 .
-├── public/                 # 前端（无构建步骤）
+├── public/                 # 前端（无构建步骤，原生 ES module）
 │   ├── index.html
-│   ├── app.js
-│   └── style.css
+│   ├── app.js              # 入口（type="module"）
+│   ├── style.css
+│   ├── lib/                # 纯逻辑，可被 Node 直接 import 测试
+│   │   ├── course-table-schema.js   # course-table-v1 校验/清洗/去重
+│   │   ├── ics-export.js            # 前端逐周展开生成 .ics
+│   │   └── sample-course-table.js   # 20 条示例数据
+│   └── ui/
+│       └── json-import.js  # 「AI JSON」面板控制器（只管交互）
 ├── src/
 │   ├── index.ts            # Worker 路由
 │   └── lib/
@@ -265,11 +292,16 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 │           ├── detect.ts   # 按页面特征识别是哪家的教务系统
 │           ├── grid.ts     # 通用「星期 × 节次」表格解析（colspan/rowspan 还原）
 │           └── zf.ts       # 正方 kbList JSON 解析
+├── docs/
+│   └── course-table-v1.md  # 给外部 AI 的 JSON 格式规范（含 20 条示例）
+├── scripts/
+│   └── check-no-llm.mjs    # 扫描 public/ 确保没有模型调用/密钥
 ├── test/
 │   ├── run.ts              # 核心逻辑测试（node 直接跑 TS）
 │   ├── server.ts           # Worker 接口冒烟测试（含 KV 模拟、跨域 CORS）
 │   ├── jw.ts               # 教务系统适配测试（正方/强智/青果/JSON 样本）
 │   ├── xlsx.ts             # Excel 解析测试（真·ZIP+deflate 夹具）
+│   ├── schema.ts           # course-table-v1 校验 + 前端 ICS 生成测试
 │   └── helpers.ts          # 测试用的 xlsx 夹具生成器 / base64
 ├── wrangler.jsonc
 └── .github/workflows/deploy.yml
