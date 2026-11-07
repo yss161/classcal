@@ -4,6 +4,7 @@ import { defaultTerm, normalizeTimetable, type Term, type Timetable } from "./li
 import { parseText } from "./lib/parse-text.ts";
 import { parseCsv } from "./lib/parse-csv.ts";
 import { guessTermStart, parseIcs } from "./lib/parse-ics.ts";
+import { importJw } from "./lib/jw/index.ts";
 import { parseDateMs } from "./lib/dates.ts";
 
 interface Fetcher {
@@ -27,9 +28,20 @@ const JSON_HEADERS: Record<string, string> = {
   "cache-control": "no-store",
 };
 
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+function json(data: unknown, status = 200, extra?: Record<string, string>): Response {
+  return new Response(JSON.stringify(data), { status, headers: extra ? { ...JSON_HEADERS, ...extra } : JSON_HEADERS });
 }
+
+/**
+ * /api/jw/import 会被书签脚本从教务系统页面直接跨域 POST，
+ * 所以这个端点必须放开 CORS（只做无状态计算，不存任何数据）。
+ */
+const CORS_HEADERS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+  "access-control-max-age": "86400",
+};
 
 function bad(msg: string, status = 400): Response {
   return json({ ok: false, error: msg }, status);
@@ -159,6 +171,36 @@ export default {
         }
         const result = kind === "csv" ? parseCsv(text, term) : kind === "ics" ? parseIcs(text, term) : parseText(text, term);
         return json({ ok: true, term, courses: result.courses, warnings: result.warnings });
+      }
+
+      /* ---------- 教务系统导入（跨域可用，供书签脚本调用） ---------- */
+      if (pathname === "/api/jw/import") {
+        if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
+        if (request.method !== "POST") return json({ ok: false, error: "只支持 POST" }, 405, CORS_HEADERS);
+        const body = await readJson(request);
+        const text = String(body.text ?? body.html ?? "");
+        if (!text.trim()) return json({ ok: false, error: "没有收到内容" }, 400, CORS_HEADERS);
+
+        let term = termFrom(body.term);
+        const result = importJw(text, term);
+        const payload: Record<string, unknown> = {
+          ok: result.ok,
+          system: result.system,
+          mode: result.mode,
+          courses: result.courses,
+          warnings: result.warnings,
+          stats: result.stats || null,
+        };
+        if (result.courses.length) {
+          const tt = normalizeTimetable({ term, courses: result.courses });
+          term = tt.term;
+          const token = await encodeToken(tt);
+          payload.token = token;
+          payload.shareUrl = url.origin + "/?d=" + token;
+          payload.count = tt.courses.length;
+        }
+        payload.term = term;
+        return json(payload, 200, CORS_HEADERS);
       }
 
       /* ---------- 预览 ICS（返回文本，不下载） ---------- */

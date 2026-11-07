@@ -9,7 +9,7 @@
 
 ## 功能
 
-- **4 种导入**：粘贴文本自动识别 / 表格手动填 / CSV / 已有 .ics 反向导入
+- **5 种导入**：粘贴文本自动识别 / 表格手动填 / CSV / 已有 .ics 反向导入 / **教务系统（正方、强智、青果、树维、URP…，书签脚本或贴源码）**
 - **自动生成 iCalendar**：周次（含单双周、断档周次）、节次时间、教室、教师、课前提醒（VALARM）、时区（默认 Asia/Shanghai）
 - **RFC 5545 合规**：75 字节折行、文字转义、VTIMEZONE、稳定 UID、RRULE 压缩周次（18 周课表只产生少量事件）
 - **两种链接模式**
@@ -23,7 +23,7 @@
 ```bash
 npm install
 npm run dev          # 打开 http://127.0.0.1:8787
-npm test             # 60 个核心逻辑断言 + 34 个接口冒烟断言
+npm test             # 149 个断言：核心逻辑 60 + 接口 43 + 教务适配 46
 npm run typecheck
 ```
 
@@ -129,13 +129,53 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 
 > 如果导入后提示「开始时间对不上节次表」，先在上方「节次时间表」里改成你们学校的作息时间，再导入。
 
-### 图片 / 教务系统？
+### 5. 教务系统（正方 / 强智 / 青果 / 树维 / URP …）
 
-暂无内置实现，属于路线图：
+**不需要把学号密码交给本工具**，也不需要服务器能访问学校内网 —— 因为解析发生在「你已经登录的浏览器页面」里，只把课表表格本身带过来。
 
-- **截图识别**：需要接视觉模型 API（自备 Key），识别后仍需人工核对。
-- **教务系统抓取**：每所学校登录方式不同，需要一校一适配（可参考 `miaotony/NUAA_ClassSchedule`、`junyilou/python-ical-timetable` 等项目的解析思路）。
-- 过渡方案：先导出成文本/CSV 粘进来，30 秒搞定。
+#### 方式 A · 书签脚本（一次点击，推荐）
+
+页面「教务系统」页签里有可拖拽的书签按钮，把它拖到书签栏。之后：
+
+1. 在电脑上登录教务系统 → 打开「我的课表 / 学生个人课表」页面；
+2. 点一下这个书签；
+3. 页面会 POST 当前 HTML 到 `/api/jw/import`（**无状态，不存任何数据**），解析成功后自动在新标签页打开本工具，课表已经填好。
+
+`.github` 无关，书签代码由前端现场生成，指向你自己部署的域名。若学校开了严格 CSP 拦住书签脚本，用方式 B。
+
+#### 方式 B · 复制页面源码粘贴（最稳）
+
+课表页按 `Ctrl+U` 看源码 → 全选复制 → 粘到「教务系统」页签的文本框 → 解析。
+也可以直接在课表页全选表格复制后粘贴。
+
+#### 方式 C · 导出文件
+
+教务系统的「导出 Excel」→ 另存为 CSV → 用上面 CSV 页签导入。
+
+#### 支持的系统
+
+| 系统 | 识别关键字 | 解析方式 |
+|---|---|---|
+| 正方教务 ZFSoft | `jwglxt` / `xskbcx` / `N2151` | 老版课表表格 grid；新版 `kbList` JSON（含页面内嵌 JSON 时自动抠出来） |
+| 强智科技 QZDatasoft | `jsxsd` / `xskb_list` | 课表表格 grid（支持 rowspan/colspan、一格多门课、单双周、教师/地点前缀） |
+| 青果 KINGOSOFT | `kingosoft` / `kbcx` | 课表表格 grid |
+| 树维 SudyTech | `sudytech` / `eams` | 课表表格 grid |
+| URP / 金智 Wisedu | `urp` / `wisedu` | 课表表格 grid / 走通用解析器 |
+| 未知系统 | — | **通用解析器**：任何「星期 × 节次」表格都能试（自动处理 colspan/rowspan、`第1-2节`、`一/二/三` 单字表头、格内 `周一第1,2节{第1-16周}`、`教师：`/`地点：` 前缀） |
+
+解析不了时页面会说明卡在哪一步（没找到表格 / 认不出星期列 / 单元格里没有周次）。
+
+#### 加一所学校的适配器（开发者）
+
+1. 打开那所学校的课表页，把源码存成 `sample.html` 放在本地；
+2. 跑 `node -e "..."` 或直接看 `test/jw.ts` 里的样本写法，用 `importJw(sample, term)` 试；
+3. 如果只是「表头/单元格写法不同」→ 在 `src/lib/jw/grid.ts` 的 `WEEKDAY_HINTS`、`PERIOD_IN_CELL`、`WEEKS_IN_LINE` 里补正则；
+   如果是完全不同的数据来源（JSON 接口）→ 在 `src/lib/jw/` 新建一个模块，仿照 `zf.ts`；
+4. 在 `test/jw.ts` 里加一个样本 + 断言，防止以后改坏。
+
+### 图片 / 截图识别？
+
+还在路线图：需要接视觉模型 API（自备 Key），识别后仍需人工核对。目前过渡方案：系统里「导出 Excel」→ CSV，或者直接「粘贴文本」。
 
 ## HTTP 接口
 
@@ -147,6 +187,7 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 | POST | `/api/encode` | `{ timetable }` → `{ token, icsUrl, webcalUrl, shareUrl }`（链接内嵌模式） |
 | POST | `/api/save` | `{ timetable, id?, key? }` → KV 固定链接（未绑定 KV 时返回 `fallback: "inline"`） |
 | GET | `/api/decode?d=<token>` | 还原课表 |
+| POST | `/api/jw/import` | **教务系统导入**（放开 CORS，供书签脚本跨域调用）：`{ text }` → `{ system, mode, courses, token, shareUrl }` |
 | POST | `/api/preview` | 返回生成的 .ics 文本，用于页面预览 |
 | GET | `/c/<token>.ics` | **订阅端点**，返回 `text/calendar` |
 | GET | `/c/<token>` | 302 跳回编辑器（分享用） |
@@ -181,8 +222,10 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 
 ## 路线图
 
+- [x] 教务系统导入：正方 / 强智 / 青果 / 树维 / URP + 通用表格解析器（书签脚本或贴源码）
+- [x] 纯文本 / CSV / .ics 导入
 - [ ] 课表截图 OCR（自备 API Key）
-- [ ] 按学校插件化导入教务系统
+- [ ] 更多学校的 JSON 接口适配（每校提 issue 即可）
 - [ ] 调课/停课（EXDATE）可视化编辑
 - [ ] 多套作息时间模板（早八/晚课）
 - [ ] 课程颜色 / 多日历分组
@@ -204,10 +247,16 @@ Storage 用量极小：一份课表约 1–3 KB。免费额度 1 GB。
 │       ├── codec.ts        # 紧凑序列化 + deflate + base64url
 │       ├── parse-text.ts   # 文本导入
 │       ├── parse-csv.ts    # CSV 导入
-│       └── parse-ics.ts    # .ics 反向导入
+│       ├── parse-ics.ts    # .ics 反向导入
+│       └── jw/             # 教务系统适配
+│           ├── index.ts    # 总入口 importJw（自动判断 JSON / HTML / 纯文本）
+│           ├── detect.ts   # 按页面特征识别是哪家的教务系统
+│           ├── grid.ts     # 通用「星期 × 节次」表格解析（colspan/rowspan 还原）
+│           └── zf.ts       # 正方 kbList JSON 解析
 ├── test/
 │   ├── run.ts              # 核心逻辑测试（node 直接跑 TS）
-│   └── server.ts           # Worker 接口冒烟测试（含 KV 模拟）
+│   ├── server.ts           # Worker 接口冒烟测试（含 KV 模拟、跨域 CORS）
+│   └── jw.ts               # 教务系统适配测试（正方/强智/青果/JSON 样本）
 ├── wrangler.jsonc
 └── .github/workflows/deploy.yml
 ```

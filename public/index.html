@@ -48,7 +48,7 @@
       <button class="tab" data-panel="panel-table" role="tab">表格手动填</button>
       <button class="tab" data-panel="panel-csv" role="tab">CSV</button>
       <button class="tab" data-panel="panel-ics" role="tab">.ics 文件</button>
-      <button class="tab" data-panel="panel-todo" role="tab">图片 / 教务系统</button>
+      <button class="tab" data-panel="panel-jw" role="tab">教务系统</button>
     </div>
 
     <div id="panel-text" class="panel active">
@@ -84,13 +84,33 @@
       <div class="row"><button class="primary" id="btnParseIcs">解析 .ics</button></div>
     </div>
 
-    <div id="panel-todo" class="panel">
-      <p class="hint">这两条是路线图（需要额外服务，不属于纯静态方案）：</p>
+    <div id="panel-jw" class="panel">
+      <p class="hint">在电脑浏览器里登录教务系统 → 打开「我的课表 / 学生个人课表 / 课表查询」页面，然后任选一种方式：</p>
+
+      <h3>方式 1 · 书签脚本（一次点击）</h3>
+      <p class="hint">把右边这个按钮<b>拖到浏览器书签栏</b>；以后在教务系统的课表页面点它一下，课表就会自动带到这里。</p>
+      <div class="row wrap">
+        <a id="bmLink" class="button-link" href="#" draggable="true">📅 课表→日历</a>
+        <button id="btnCopyBm" class="ghost">复制书签代码</button>
+      </div>
+      <p class="hint">脚本只在你自己的浏览器里读取当前页面，把课表表格 POST 到本站解析，<b>不碰账号密码、不在服务器留数据</b>。若教务系统开了严格 CSP 拦住了书签脚本，用方式 2。</p>
+
+      <h3>方式 2 · 复制页面源码粘贴（最稳）</h3>
+      <p class="hint">在课表页面按 <code>Ctrl+U</code>（或右键 → 查看网页源代码）后全选复制，粘到下面；直接选中课表表格复制也常常可以。</p>
+      <input type="file" id="jwFile" accept=".html,.htm,.json,.txt" />
+      <textarea id="jwInput" rows="8" placeholder="粘贴课表页面的 HTML 源码 / 页面里 kbList 的 JSON / 复制出来的纯文本课表" spellcheck="false"></textarea>
+      <div class="row"><button class="primary" id="btnParseJw">解析教务系统课表</button></div>
+      <div id="jwMeta" class="hint"></div>
+
+      <h3>支持的教务系统</h3>
       <ul class="todo">
-        <li><b>课表截图 / 图片识别</b>：需要接视觉模型 API（自己填 Key），识别后仍要人工核对。</li>
-        <li><b>教务系统一键抓取</b>：每所学校登录方式不同，需要一校一个适配器；建议先用上面的文本粘贴/CSV 过渡。</li>
+        <li><b>正方教务（ZFSoft）</b>：老版 <code>xskbcx.aspx</code> 课表表格；新版 <code>kbList</code> JSON（<code>jwglxt/kbcx/...</code>）</li>
+        <li><b>强智科技（QZDatasoft）</b>：<code>/jsxsd/xskb/xskb_list.do</code>（含一格多门课、单双周）</li>
+        <li><b>青果软件（KINGOSOFT）</b>、<b>树维（SudyTech）</b>、<b>URP 综合教务</b>、<b>金智 / Wisedu</b> 等「星期 × 节次」表格</li>
+        <li>识别不出来也能试：任何标准课表表格都会走<b>通用解析器</b>；再不行就用「粘贴文本」</li>
       </ul>
-      <p class="hint">现状：先导出成文本或 CSV，粘到「粘贴文本」里，30 秒搞定。</p>
+      <p class="hint">如果你学校的课表结构比较特别，把<b>脱敏后的页面源码</b>发个 issue，加一个适配器很快。</p>
+      <p class="hint">📷 课表截图识别还在路线图里（需要视觉模型 API Key）；目前可以先用系统自带的「导出 Excel」→ 存成 CSV → 用 CSV 页签导入。</p>
     </div>
 
     <div id="warnings" class="warnings" hidden></div>

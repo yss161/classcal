@@ -71,24 +71,38 @@ export function parseText(text: string, term: Term): ParseResult {
     let weeks: number[] = [];
     const rest: string[] = [];
 
+    // 逐个字段「剥」信息：星期 / 节次 / 周次，剥完剩下的才可能是课程名、教室、教师
     for (const f of fields) {
-      const d = day ? 0 : parseDay(f);
-      if (d) { day = d; continue; }
-      const p: { start: number; end: number } | null = periods ? null : parsePeriods(f);
-      if (p && !weeks.length) {
-        // 字段里同时含周次时继续走下面的解析
-        periods = p;
-        const w = parseWeeksFrom(f, term.weeks);
-        if (w.length) weeks = w;
-        continue;
+      let leftover = f;
+      let usedPeriod = false;
+
+      if (!day) {
+        const d = parseDay(leftover);
+        if (d) { day = d; leftover = leftover.replace(/(?:周|星期|礼拜)\s*[一二三四五六日天1-7]/g, " "); }
       }
-      const w = parseWeeksFrom(f, term.weeks);
-      if (w.length && !weeks.length) { weeks = w; continue; }
-      if (!weeks.length && periods && WEEKLIKE.test(f.trim())) {
-        const w2 = parseWeeks(f, term.weeks);
-        if (w2.length) { weeks = w2; continue; }
+      if (!periods) {
+        const p = parsePeriods(leftover);
+        if (p) {
+          periods = p;
+          usedPeriod = true;
+          leftover = leftover.replace(/第?\s*\d{1,2}\s*(?:[-–—~～、,，至到]\s*\d{1,2}\s*)?节/g, " ");
+          if (/^[\d\s,，、~～\-—至到]+$/.test(leftover.trim())) leftover = " ";
+        }
       }
-      rest.push(f);
+      if (!weeks.length) {
+        const w = parseWeeksFrom(leftover, term.weeks);
+        if (w.length) {
+          weeks = w;
+          leftover = leftover.replace(/(?:第)?[\d,，、~～\-—\s]+?\s*周(?:次)?\s*[（(]?\s*[单双]?\s*[）)]?/g, " ");
+        }
+      }
+      if (!weeks.length && periods && !usedPeriod && WEEKLIKE.test(leftover.trim())) {
+        const w2 = parseWeeks(leftover, term.weeks);
+        if (w2.length) { weeks = w2; leftover = " "; }
+      }
+
+      leftover = leftover.replace(/[{}（）()]/g, " ").replace(/\s+/g, " ").trim();
+      if (leftover) rest.push(leftover);
     }
 
     if (!day || !periods || !weeks.length) {

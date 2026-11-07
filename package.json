@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node test/run.ts && node test/server.ts",
+    "test": "node test/run.ts && node test/server.ts && node test/jw.ts",
     "test:core": "node test/run.ts",
     "test:server": "node test/server.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:jw": "node test/jw.ts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

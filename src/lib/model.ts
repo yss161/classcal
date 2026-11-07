@@ -77,13 +77,20 @@ export function parseWeeks(spec: string, total: number): number[] {
   const out = new Set<number>();
   const cap = total > 0 ? total : 30;
   const raw = String(spec || "")
-    .replace(/[（(]/g, " ")
-    .replace(/[）)]/g, " ")
+    .replace(/周次?/g, " ")
+    .replace(/[（(）)\[]/g, "")
+    .replace(/[\]）]/g, "")
     .replace(/，/g, ",")
     .replace(/[~～至到]/g, "-")
     .trim();
   if (!raw) return [];
-  for (const chunkRaw of raw.split(/[,、\s]+/)) {
+  // "(单)" 被拆成独立的一段时，粘回前一段
+  const chunks: string[] = [];
+  for (const piece of raw.split(/[,、\s]+/).filter(Boolean)) {
+    if (/^[单双]$/.test(piece) && chunks.length) chunks[chunks.length - 1] += piece;
+    else chunks.push(piece);
+  }
+  for (const chunkRaw of chunks) {
     let chunk = chunkRaw.trim();
     if (!chunk) continue;
     let parity = 0;

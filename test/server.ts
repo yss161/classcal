@@ -116,5 +116,32 @@ ok("未知 id 返回 404", missing.status === 404);
 ok("未知 KV id 的 .ics 返回 404", (await callKv("/c/kzzzzzzzzzzz.ics")).status === 404);
 ok("KV 模式下 /c/<id> 跳转", (await callKv("/c/" + save.id)).status === 302);
 
+/* ---------------- 教务系统导入（跨域书签脚本用） ---------------- */
+console.log("\n[10] /api/jw/import（跨域）");
+const jwHtml = '<html><body><div>正方教务管理系统</div><table>'
+  + '<tr><td>节次</td><td>星期一</td><td>星期二</td></tr>'
+  + '<tr><td>第1-2节</td><td>高等数学<br>1-16周<br>教1-101<br>张老师</td><td></td></tr>'
+  + '<tr><td>第3-4节</td><td></td><td>大学英语<br>1-16周(单)<br>外语楼302</td></tr>'
+  + '</table></body></html>';
+const pre = await call("/api/jw/import", { method: "OPTIONS" });
+ok("OPTIONS 204 + CORS", pre.status === 204 && pre.headers.get("access-control-allow-origin") === "*");
+const jwRes = await call("/api/jw/import", {
+  method: "POST",
+  headers: { "content-type": "text/plain", origin: "https://jw.example.edu.cn" },
+  body: JSON.stringify({ text: jwHtml, term }),
+});
+const jw = await jwRes.json();
+ok("响应带 CORS 头", jwRes.headers.get("access-control-allow-origin") === "*");
+ok("解析出 2 门课", jw.ok && jw.count === 2, JSON.stringify(jw).slice(0, 200));
+ok("识别为正方", jw.system && jw.system.id === "zf", JSON.stringify(jw.system));
+ok("返回 token + shareUrl", typeof jw.token === "string" && jw.shareUrl.includes("?d="));
+const jwDecoded = await (await call("/api/decode?d=" + jw.token)).json();
+ok("token 可用（decode 成功）", jwDecoded.ok === true && jwDecoded.timetable.courses.length === 2);
+ok("shareUrl 指向编辑器", jw.shareUrl.includes("/?d=" + jw.token));
+const jwPlain = await (await call("/api/jw/import", { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ text: "体育 周五 5-6节 1-16周 田径场", term }) })).json();
+ok("纯文本也能解析", jwPlain.ok === true && jwPlain.count === 1 && jwPlain.mode === "text", JSON.stringify(jwPlain).slice(0, 160));
+const jwBad = await (await call("/api/jw/import", { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ text: "<b>没有课表</b>", term }) })).json();
+ok("解析失败时 ok:false 且有提示", jwBad.ok === false && (jwBad.warnings || []).length > 0);
+
 console.log("\n结果: " + pass + " 通过, " + fail + " 失败");
 if (fail) process.exit(1);

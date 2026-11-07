@@ -205,3 +205,15 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 
   border: 1px solid #cbe9d6;
 }
 .badge.inline { background: #eef2f8; color: #4a5b74; border-color: #dbe3ee; }
+
+.panel h3 { font-size: 14px; margin: 18px 0 6px; color: #1f3d61; }
+.panel code, .hint code {
+  background: #f2f5fa;
+  border: 1px solid #e3e8f0;
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+#bmLink { cursor: grab; }
+#bmLink:active { cursor: grabbing; }

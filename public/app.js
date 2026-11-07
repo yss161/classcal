@@ -254,13 +254,22 @@ function showWarnings(list) {
 
 async function callParse(kind, text) {
   if (!text || !text.trim()) { toast("先粘贴/选择内容"); return; }
-  const res = await fetch("/api/parse", {
+  const isJw = kind === "jw";
+  const res = await fetch(isJw ? "/api/jw/import" : "/api/parse", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ kind, text, term: state.term }),
+    body: JSON.stringify(isJw ? { text, term: state.term } : { kind, text, term: state.term }),
   });
   const data = await res.json();
-  if (!data.ok) { toast(data.error || "解析失败"); return; }
+  if (isJw) {
+    const meta = document.getElementById("jwMeta");
+    if (meta) {
+      const sys = data.system ? data.system.name : "未知系统";
+      const st = data.stats ? "（表格 " + data.stats.tables + " 个 / 星期列 " + data.stats.weekdayCols + " / 节次行 " + data.stats.periodRows + "）" : "";
+      meta.textContent = "识别为：" + sys + " · 解析方式：" + (data.mode || "-") + st;
+    }
+  }
+  if (!data.ok) { toast(data.error || "解析失败"); showWarnings(data.warnings || []); return; }
   if (data.term && data.term.start) {
     state.term.start = data.term.start;
     $("#termStart").value = data.term.start;
@@ -282,6 +291,36 @@ function mergeCourseLists(a, b) {
     else out.push(c);
   }
   return out;
+}
+
+function buildBookmarklet() {
+  const origin = location.origin;
+  const code =
+    "(async()=>{try{" +
+    "const h=document.documentElement.outerHTML;" +
+    "const r=await fetch('" + origin + "/api/jw/import',{method:'POST',headers:{'content-type':'text/plain'},body:JSON.stringify({text:h})});" +
+    "const d=await r.json();" +
+    "if(!d.ok||!d.shareUrl){alert('没解析出课程：'+((d.warnings&&d.warnings[0])||d.error||'未知原因')+'。可以改用「复制页面源码」方式粘贴到工具里。');return;}" +
+    "window.open(d.shareUrl,'_blank')||(location.href=d.shareUrl);" +
+    "}catch(e){alert('请求失败：'+e+'。可以改用「复制页面源码」方式。');}})()";
+  return "javascript:" + code;
+}
+
+function bindJw() {
+  const bm = document.getElementById("bmLink");
+  if (bm) bm.setAttribute("href", buildBookmarklet());
+  const copyBtn = document.getElementById("btnCopyBm");
+  if (copyBtn) copyBtn.addEventListener("click", () => copy(buildBookmarklet()));
+  const parseBtn = document.getElementById("btnParseJw");
+  if (parseBtn) parseBtn.addEventListener("click", () => callParse("jw", document.getElementById("jwInput").value));
+  const file = document.getElementById("jwFile");
+  if (file) file.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const text = await f.text();
+    document.getElementById("jwInput").value = text.slice(0, 400000);
+    callParse("jw", text);
+  });
 }
 
 function bindImport() {
@@ -487,6 +526,7 @@ async function init() {
   bindTerm();
   bindTable();
   bindImport();
+  bindJw();
   bindGenerate();
   bindUnlink();
   bindMisc();
