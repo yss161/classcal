@@ -17,6 +17,8 @@ export interface GridCell {
   rowspan: number;
   colspan: number;
   isHeader: boolean;
+  /** 被合并区域「覆盖」出来的空位（Excel 的合并单元格 / HTML 的 rowspan-colspan 占位） */
+  covered?: boolean;
 }
 
 export interface ParsedTable {
@@ -35,7 +37,7 @@ const WEEKDAY_HINTS: [RegExp, number][] = [
   [/^(星期|周|礼拜)\s*[日天]$|^[日天]$|^7$|^sun/i, 7],
 ];
 
-const LOC_HINT = /(楼|教|室|馆|厅|场|区|栋|中心|基地|实验室|^[A-Za-z]?\d+[-#]?\d*$)/;
+const LOC_HINT = /(楼|教|室|馆|厅|场|区|栋|房|机|堂|中心|基地|实验室|^[A-Za-z]?\d+[-#]?\d*$)/;
 const TEACHER_PREFIX = /^\s*(教师|老师|任课教师|授课教师)\s*[:：]\s*/;
 const LOC_PREFIX = /^\s*(地点|教室|上课地点|场地)\s*[:：]\s*/;
 const PERIOD_IN_CELL = /(?:周|星期|礼拜)\s*([一二三四五六日天])\s*第?\s*([\d,，、\-~～至到]+)\s*节/;
@@ -111,7 +113,9 @@ export function parseTableHtml(tableHtml: string): ParsedTable {
     for (let c = 0; c < maxCol; c++) {
       const own = grid[r] && grid[r][c];
       const covered = occupy[r + ":" + c];
-      cells[r][c] = own || covered || { text: "", row: r, col: c, rowspan: 1, colspan: 1, isHeader: false };
+      if (own) cells[r][c] = own;
+      else if (covered) cells[r][c] = { text: "", row: r, col: c, rowspan: 1, colspan: 1, isHeader: false, covered: true };
+      else cells[r][c] = { text: "", row: r, col: c, rowspan: 1, colspan: 1, isHeader: false };
     }
   }
   return { cells, rowCount: cells.length, colCount: maxCol };
@@ -264,10 +268,13 @@ export function parseCellCourses(text: string, term: Term, day: number, periods:
       continue;
     }
 
-    // 已经拿到课程名和周次之后的行，按「教室 → 教师」顺序补
-    if (cur.name && cur.weeks.length) {
-      if (!cur.loc && LOC_HINT.test(line)) { cur.loc = line; continue; }
-      if (!cur.teacher) { cur.teacher = line; continue; }
+    // 已经有了课程名之后的行：先认教室，再认教师
+    if (cur.name) {
+      if (!cur.loc && LOC_HINT.test(line) && /[\dA-Za-z]|楼|教|室|馆|厅|场|区|栋|房|机|堂/.test(line)) { cur.loc = line; continue; }
+      if (!cur.teacher && cur.weeks.length && /^[\u4e00-\u9fa5]{2,5}$/.test(line) && !/(楼|室|房|馆|场|区|栋)$/.test(line)) {
+        cur.teacher = line;
+        continue;
+      }
     }
 
     if (cur.name) push();
@@ -291,6 +298,73 @@ export function parseCellCourses(text: string, term: Term, day: number, periods:
   return out.filter((c) => c.weeks.length);
 }
 
+/** 二维字符串 + 合并区域 → 和 HTML 表格同样的结构（给 Excel 用） */
+export function matrixToTable(rows: string[][], merges: { r1: number; c1: number; r2: number; c2: number }[]): ParsedTable {
+  const rowCount = rows.length;
+  let colCount = rows.reduce((n, r) => Math.max(n, r.length), 0);
+  for (const m of merges) colCount = Math.max(colCount, m.c2 + 1);
+
+  const cells: GridCell[][] = [];
+  for (let r = 0; r < rowCount; r++) {
+    cells[r] = [];
+    for (let c = 0; c < colCount; c++) {
+      const text = (rows[r] && rows[r][c]) || "";
+      cells[r][c] = { text: String(text).trim(), row: r, col: c, rowspan: 1, colspan: 1, isHeader: false };
+    }
+  }
+
+  for (const m of merges) {
+    const origin = cells[m.r1] && cells[m.r1][m.c1];
+    if (!origin) continue;
+    origin.rowspan = Math.max(1, m.r2 - m.r1 + 1);
+    origin.colspan = Math.max(1, m.c2 - m.c1 + 1);
+    for (let r = m.r1; r <= m.r2; r++) {
+      for (let c = m.c1; c <= m.c2; c++) {
+        if (r === m.r1 && c === m.c1) continue;
+        cells[r][c] = { text: "", row: r, col: c, rowspan: 1, colspan: 1, isHeader: false, covered: true };
+      }
+    }
+  }
+  return { cells, rowCount, colCount };
+}
+
+/**
+ * 从已经认好结构的表格里取课程。
+ * 只处理合并区域的「左上角」单元格，并用 rowspan/colspan 推断跨了几节课 / 几天。
+ */
+export function collectCourses(table: ParsedTable, layout: TableLayout, term: Term): { courses: Course[]; cells: number } {
+  const courses: Course[] = [];
+  let cells = 0;
+  for (let r = layout.headerRow + 1; r < table.rowCount; r++) {
+    const basePeriods = layout.rowPeriod[r] || null;
+    for (const c of Object.keys(layout.colDay).map(Number)) {
+      const cell = table.cells[r] && table.cells[r][c];
+      if (!cell || !cell.text || cell.covered) continue;
+      if (weekdayOf(cell.text)) continue;
+      // 某些表把「上午/下午」做成合并行、节次写在单元格里，这时行上没有节次表，
+      // 只要单元格自己带「周一第1,2节」这种信息就仍然能救回来
+      if (!basePeriods && !PERIOD_IN_CELL.test(cell.text)) continue;
+      cells++;
+
+      // 竖向合并：跨了几行节次，结束节次跟着延后
+      let periods = basePeriods || { start: 1, end: 1 };
+      if (cell.rowspan > 1) {
+        for (let k = 1; k < cell.rowspan; k++) {
+          const next = layout.rowPeriod[r + k];
+          if (next) periods = { start: periods.start, end: Math.max(periods.end, next.end) };
+        }
+      }
+
+      // 横向合并：一门课占了两天（少见），两边都算上
+      for (let d = 0; d < Math.max(1, cell.colspan); d++) {
+        const day = layout.colDay[c + d];
+        if (day) courses.push(...parseCellCourses(cell.text, term, day, periods));
+      }
+    }
+  }
+  return { courses, cells };
+}
+
 export interface GridParseResult {
   courses: Course[];
   warnings: string[];
@@ -312,19 +386,9 @@ export function parseTimetableHtml(html: string, term: Term): GridParseResult {
   }
 
   const layout = analyzeTable(table.cells);
-  const courses: Course[] = [];
-  let cells = 0;
-  for (let r = layout.headerRow + 1; r < table.rowCount; r++) {
-    const periods = layout.rowPeriod[r];
-    if (!periods) continue;
-    for (const c of Object.keys(layout.colDay).map(Number)) {
-      const cell = table.cells[r] && table.cells[r][c];
-      if (!cell || !cell.text) continue;
-      if (weekdayOf(cell.text)) continue;
-      cells++;
-      courses.push(...parseCellCourses(cell.text, term, layout.colDay[c], periods));
-    }
-  }
+  const collected = collectCourses(table, layout, term);
+  const courses = collected.courses;
+  const cells = collected.cells;
 
   const merged = new Map<string, Course>();
   for (const c of courses) {

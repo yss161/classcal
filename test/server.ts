@@ -2,6 +2,7 @@
 import worker from "../src/index.ts";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { makeXlsxSample, toBase64 } from "./helpers.ts";
 
 const PUBLIC = join(process.cwd(), "public");
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -142,6 +143,23 @@ const jwPlain = await (await call("/api/jw/import", { method: "POST", headers: {
 ok("纯文本也能解析", jwPlain.ok === true && jwPlain.count === 1 && jwPlain.mode === "text", JSON.stringify(jwPlain).slice(0, 160));
 const jwBad = await (await call("/api/jw/import", { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ text: "<b>没有课表</b>", term }) })).json();
 ok("解析失败时 ok:false 且有提示", jwBad.ok === false && (jwBad.warnings || []).length > 0);
+
+/* ---------------- Excel 导入 ---------------- */
+console.log("\n[11] Excel（.xlsx）导入");
+const xlsxBytes = await makeXlsxSample({ grid: true, list: true });
+const xl = await (await postJson("/api/parse", { kind: "xlsx", data: toBase64(xlsxBytes), term })).json();
+ok("解析出 3 门课", xl.ok && xl.courses.length === 3, JSON.stringify(xl).slice(0, 200));
+ok("命中课表式", xl.mode === "grid" && xl.sheet === "课表", JSON.stringify({ mode: xl.mode, sheet: xl.sheet }));
+const xlEnc = await (await postJson("/api/encode", { timetable: { term, courses: xl.courses } })).json();
+ok("Excel 解析结果能直接生成订阅", xlEnc.ok === true && xlEnc.tokenLength > 0);
+const xlIcs = await (await call(new URL(xlEnc.icsUrl).pathname)).text();
+ok("生成的 ICS 含 Excel 里的课", xlIcs.includes("SUMMARY:高等数学") && xlIcs.includes("SUMMARY:程序设计"));
+
+const xlsBytes = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, ...new Array(200).fill(0)]);
+const xlsRes = await (await postJson("/api/parse", { kind: "xlsx", data: toBase64(xlsBytes), term })).json();
+ok("老 .xls 给出可读提示", xlsRes.ok === false && JSON.stringify(xlsRes.warnings).includes("另存为 .xlsx"), JSON.stringify(xlsRes.warnings));
+const emptyRes = await (await postJson("/api/parse", { kind: "xlsx", data: "", term })).json();
+ok("空文件 400", emptyRes.error === "没有收到 Excel 文件内容", JSON.stringify(emptyRes));
 
 console.log("\n结果: " + pass + " 通过, " + fail + " 失败");
 if (fail) process.exit(1);

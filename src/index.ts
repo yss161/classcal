@@ -5,6 +5,7 @@ import { parseText } from "./lib/parse-text.ts";
 import { parseCsv } from "./lib/parse-csv.ts";
 import { guessTermStart, parseIcs } from "./lib/parse-ics.ts";
 import { importJw } from "./lib/jw/index.ts";
+import { parseXlsxBase64 } from "./lib/parse-xlsx.ts";
 import { parseDateMs } from "./lib/dates.ts";
 
 interface Fetcher {
@@ -163,8 +164,23 @@ export default {
         const body = await readJson(request);
         const kind = String(body.kind || "text");
         const text = String(body.text || "");
-        if (!text.trim()) return bad("没有收到内容");
+        // Excel 走的是二进制（base64 在 data 里），没有 text
+        if (!text.trim() && kind !== "xlsx") return bad("没有收到内容");
         let term = termFrom(body.term);
+
+        // Excel：前端把文件读成 base64 一起发过来
+        if (kind === "xlsx") {
+          const data = String(body.data || "");
+          if (!data) return bad("没有收到 Excel 文件内容");
+          try {
+            const x = await parseXlsxBase64(data, term);
+            return json({ ok: x.courses.length > 0, term, courses: x.courses, warnings: x.warnings, sheet: x.sheet, mode: x.mode });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return json({ ok: false, term, courses: [], warnings: ["Excel 读取失败：" + msg] });
+          }
+        }
+
         if (kind === "ics") {
           const guessed = guessTermStart(text, term);
           if (guessed) term = { ...term, start: guessed };

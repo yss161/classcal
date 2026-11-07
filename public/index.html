@@ -46,7 +46,7 @@
     <div class="tabs" role="tablist">
       <button class="tab active" data-panel="panel-text" role="tab">粘贴文本</button>
       <button class="tab" data-panel="panel-table" role="tab">表格手动填</button>
-      <button class="tab" data-panel="panel-csv" role="tab">CSV</button>
+      <button class="tab" data-panel="panel-csv" role="tab">Excel / CSV</button>
       <button class="tab" data-panel="panel-ics" role="tab">.ics 文件</button>
       <button class="tab" data-panel="panel-jw" role="tab">教务系统</button>
     </div>
@@ -70,8 +70,9 @@
     </div>
 
     <div id="panel-csv" class="panel">
-      <p class="hint">支持表头：课程名称,星期,节次,周次,教室,教师（顺序不限，可只给部分列）。</p>
-      <input type="file" id="csvFile" accept=".csv,text/csv" />
+      <p class="hint"><b>Excel（.xlsx）</b> 直接拖进来即可：会自动分辨是「星期 × 节次」的课表，还是一行一门课的列表。也支持合并单元格、单双周、断档周次。</p>
+      <input type="file" id="csvFile" accept=".xlsx,.xls,.csv,.txt,text/csv" />
+      <p class="hint">CSV 支持表头：课程名称,星期,节次,周次,教室,教师（顺序不限，可只给部分列）。老版 <code>.xls</code> 请先另存为 <code>.xlsx</code>。</p>
       <textarea id="csvInput" rows="6" placeholder="课程名称,星期,节次,周次,教室,教师&#10;高等数学,周一,1-2,1-16,教1-101,张老师" spellcheck="false"></textarea>
       <div class="row"><button class="primary" id="btnParseCsv">解析 CSV</button></div>
     </div>

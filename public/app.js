@@ -252,13 +252,21 @@ function showWarnings(list) {
   box.innerHTML = "<b>有 " + list.length + " 条提示：</b><ul>" + list.slice(0, 12).map((w) => "<li>" + escAttr(w) + "</li>").join("") + "</ul>" + (list.length > 12 ? "<p>…还有其他 " + (list.length - 12) + " 条</p>" : "");
 }
 
-async function callParse(kind, text) {
-  if (!text || !text.trim()) { toast("先粘贴/选择内容"); return; }
+function bytesToBase64(bytes) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+async function callParse(kind, text, extra) {
+  if (kind !== "xlsx" && (!text || !text.trim()) && !(extra && extra.data)) { toast("先粘贴/选择内容"); return; }
   const isJw = kind === "jw";
+  const body = isJw ? { text, term: state.term } : Object.assign({ kind, text, term: state.term }, extra || {});
   const res = await fetch(isJw ? "/api/jw/import" : "/api/parse", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(isJw ? { text, term: state.term } : { kind, text, term: state.term }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   if (isJw) {
@@ -341,6 +349,17 @@ function bindImport() {
   $("#csvFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
+    const name = (f.name || "").toLowerCase();
+    if (name.endsWith(".xls")) {
+      showWarnings(["这是老版 .xls 格式，请在 Excel / WPS 里「另存为 .xlsx」后再导入（或者另存为 CSV）。"]);
+      return;
+    }
+    if (name.endsWith(".xlsx")) {
+      const buf = await f.arrayBuffer();
+      const data = bytesToBase64(new Uint8Array(buf));
+      await callParse("xlsx", "", { data });
+      return;
+    }
     const text = await f.text();
     $("#csvInput").value = text;
     callParse("csv", text);
