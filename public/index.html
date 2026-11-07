@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>课表 → iPhone 日历</title>
+<meta name="description" content="把课程表变成 iPhone 日历订阅链接，不装 App。" />
+<meta name="theme-color" content="#0b6bcb" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="hero">
+  <h1>课表 → iPhone 日历</h1>
+  <p class="sub">填好课表，生成一个订阅链接，用 iPhone 自带日历订阅它。不装 App、不用开发者证书，课表改了链接内容自动更新。</p>
+</header>
+
+<main>
+  <!-- 1. 学期设置 -->
+  <section class="card">
+    <h2><span class="step">1</span>学期设置</h2>
+    <div class="grid">
+      <label>学期名称<input id="termName" type="text" maxlength="60" placeholder="例如 2026 秋" /></label>
+      <label>开学第一周的周一<input id="termStart" type="date" /></label>
+      <label>总周数<input id="termWeeks" type="number" min="1" max="60" value="18" /></label>
+      <label>课前提醒
+        <select id="termAlarm">
+          <option value="0">不提醒</option>
+          <option value="5">提前 5 分钟</option>
+          <option value="10" selected>提前 10 分钟</option>
+          <option value="15">提前 15 分钟</option>
+          <option value="30">提前 30 分钟</option>
+        </select>
+      </label>
+    </div>
+    <details class="periods">
+      <summary>节次时间表（每行一节，格式 <code>08:00-08:45</code>）</summary>
+      <textarea id="periodsText" rows="12" spellcheck="false"></textarea>
+      <p class="hint">教务系统的作息时间不同的话，改成你自己学校的即可。第 1 行 = 第 1 节。</p>
+    </details>
+  </section>
+
+  <!-- 2. 导入 -->
+  <section class="card">
+    <h2><span class="step">2</span>导入课表</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-panel="panel-text" role="tab">粘贴文本</button>
+      <button class="tab" data-panel="panel-table" role="tab">表格手动填</button>
+      <button class="tab" data-panel="panel-csv" role="tab">CSV</button>
+      <button class="tab" data-panel="panel-ics" role="tab">.ics 文件</button>
+      <button class="tab" data-panel="panel-todo" role="tab">图片 / 教务系统</button>
+    </div>
+
+    <div id="panel-text" class="panel active">
+      <p class="hint">每行一门课，星期 / 节次 / 周次会自动识别，顺序随意：</p>
+      <pre class="sample">高等数学 周一 1-2节 1-16周 教1-101 张老师
+大学英语 周三 3-4节 1-16周(单) 外语楼302
+线性代数|周二|5-6|1-8,10-16|教2-201|李老师
+体育 周五 5-6节 1-16周 田径场</pre>
+      <textarea id="textInput" rows="8" placeholder="把教务系统 / 课表 App 里的课表复制进来" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="primary" id="btnParseText">解析文本</button>
+        <label class="inline"><input type="checkbox" id="appendMode" /> 追加到现有课表（默认覆盖）</label>
+      </div>
+    </div>
+
+    <div id="panel-table" class="panel">
+      <p class="hint">点击表格最后一行的「+ 添加一行」，逐门填写。周次写法：<code>1-16</code>、<code>1-16单</code>、<code>1-8,10-16</code>。</p>
+      <button class="primary" id="btnAddRow">+ 添加一行</button>
+    </div>
+
+    <div id="panel-csv" class="panel">
+      <p class="hint">支持表头：课程名称,星期,节次,周次,教室,教师（顺序不限，可只给部分列）。</p>
+      <input type="file" id="csvFile" accept=".csv,text/csv" />
+      <textarea id="csvInput" rows="6" placeholder="课程名称,星期,节次,周次,教室,教师&#10;高等数学,周一,1-2,1-16,教1-101,张老师" spellcheck="false"></textarea>
+      <div class="row"><button class="primary" id="btnParseCsv">解析 CSV</button></div>
+    </div>
+
+    <div id="panel-ics" class="panel">
+      <p class="hint">已经有 .ics（例如从 WakeUp 课程表、其他日历 App 导出的），可以直接反向导入，日期会按节次时间表自动换算成第几周。</p>
+      <input type="file" id="icsFile" accept=".ics,text/calendar" />
+      <div class="row"><span class="hint">或者把内容粘贴到下面：</span></div>
+      <textarea id="icsInput" rows="6" placeholder="BEGIN:VCALENDAR ..." spellcheck="false"></textarea>
+      <div class="row"><button class="primary" id="btnParseIcs">解析 .ics</button></div>
+    </div>
+
+    <div id="panel-todo" class="panel">
+      <p class="hint">这两条是路线图（需要额外服务，不属于纯静态方案）：</p>
+      <ul class="todo">
+        <li><b>课表截图 / 图片识别</b>：需要接视觉模型 API（自己填 Key），识别后仍要人工核对。</li>
+        <li><b>教务系统一键抓取</b>：每所学校登录方式不同，需要一校一个适配器；建议先用上面的文本粘贴/CSV 过渡。</li>
+      </ul>
+      <p class="hint">现状：先导出成文本或 CSV，粘到「粘贴文本」里，30 秒搞定。</p>
+    </div>
+
+    <div id="warnings" class="warnings" hidden></div>
+  </section>
+
+  <!-- 3. 课表 -->
+  <section class="card">
+    <h2><span class="step">3</span>课表（<span id="courseCount">0</span> 门 · 每周 <span id="weeklyHours">0</span> 节）</h2>
+    <div class="table-wrap">
+      <table id="courseTable">
+        <thead>
+          <tr><th>课程</th><th>星期</th><th>节次</th><th>周次</th><th>教室</th><th>教师</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button id="btnAddRow2" class="ghost">+ 添加一行</button>
+      <button id="btnDemo" class="ghost">填入示例课表</button>
+      <button id="btnClear" class="ghost danger">清空</button>
+    </div>
+  </section>
+
+  <!-- 4. 生成 -->
+  <section class="card">
+    <h2><span class="step">4</span>生成订阅链接</h2>
+    <div class="row wrap">
+      <button class="primary big" id="btnGenerate">生成订阅链接</button>
+      <span id="genInfo" class="hint"></span>
+      <span id="modeBadge" class="badge" hidden></span>
+    </div>
+    <div id="result" class="result" hidden>
+      <label>订阅地址（复制后粘到 iPhone 设置里）
+        <input id="outIcs" type="text" readonly />
+      </label>
+      <div class="row wrap">
+        <button id="btnCopyIcs" class="primary">复制链接</button>
+        <a id="btnSubscribe" class="button-link" href="#">① 直接订阅（iPhone 上点这里）</a>
+        <button id="btnDownload" class="ghost">下载 .ics 文件</button>
+        <button id="btnPreview" class="ghost">预览内容</button>
+        <button id="btnUnlink" class="ghost" hidden>改成链接内嵌模式</button>
+      </div>
+      <div class="row wrap">
+        <span class="hint">分享/备份链接（打开可还原课表）：</span>
+        <input id="outShare" type="text" readonly class="share" />
+        <button id="btnCopyShare" class="ghost">复制</button>
+      </div>
+    </div>
+
+    <details class="howto">
+      <summary>iPhone 上怎么加？（30 秒）</summary>
+      <ol>
+        <li>在 iPhone 的 Safari 里打开本页面，并用下面按钮生成链接。</li>
+        <li>点「① 直接订阅」会直接跳到日历订阅页；或者手动：<b>设置 → 日历 → 账户 → 添加账户 → 其他 → 添加已订阅的日历</b>，把「订阅地址」粘进去。</li>
+        <li>系统日历里就会出现课表，课前会按你设置的提前量提醒。</li>
+        <li>课表改了：回到本页改完再点「生成订阅链接」——如果订阅地址没变（内容相同），iPhone 会自己刷新；内容变了会生成新链接，需要在日历里把旧的删掉、加新的。</li>
+      </ol>
+      <p class="hint">注意：订阅日历是只读的、同步有延迟（几小时到一天）；想立刻看到变化，可以用「下载 .ics 文件」再导入一次。</p>
+      <p class="hint" id="modeExplain"></p>
+    </details>
+  </section>
+</main>
+
+<footer>
+  <p>数据不上传服务器：课表被压缩后放在链接本身里（所以你的订阅地址就是数据）。不想要了就把链接销毁。</p>
+</footer>
+
+<div id="toast" class="toast"></div>
+<pre id="previewBox" class="preview" hidden></pre>
+<script src="/app.js"></script>
+</body>
+</html>
