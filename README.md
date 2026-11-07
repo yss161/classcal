@@ -50,7 +50,7 @@ npm run typecheck
 
 ### C. GitHub Actions（仓库自带工作流）
 
-`.github/workflows/deploy.yml` 已经写好：push 到 `main` 时先跑 typecheck + 测试，再部署。
+`.github/workflows/deploy.yml` 已经写好：push 到 `main` 时先跑 typecheck + 测试，再部署；**没配下面两个 secret 时部署步骤会自动跳过**（只跑测试，不会报红）。
 只需要在仓库 **Settings → Secrets and variables → Actions** 里加两个 secret：
 
 | Secret | 说明 |

@@ -30,7 +30,21 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+
+      - name: 检查是否配置了 Cloudflare 凭据
+        id: cf
+        env:
+          API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$API_TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::没有配置 CLOUDFLARE_API_TOKEN，跳过部署。想自动部署请在 Settings → Secrets 里加上它，或本地执行 npm run deploy。"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to Cloudflare Workers
+        if: steps.cf.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
